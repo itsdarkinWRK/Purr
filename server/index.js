@@ -8,8 +8,16 @@ import { randomUUID } from "crypto";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join, dirname, extname } from "path";
 import { fileURLToPath } from "url";
+import { config as dotenvConfig } from "dotenv";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// Try loading .env from parent dir (for Render Secret Files mounted at repo root)
+const parentEnv = join(__dirname, "..", ".env");
+if (existsSync(parentEnv)) {
+  const parsed = dotenvConfig({ path: parentEnv });
+  if (parsed?.parsed) Object.assign(process.env, parsed.parsed);
+}
 const DB_PATH = join(__dirname, "bookings.json");
 const REVIEWS_DB_PATH = join(__dirname, "reviews.json");
 const UPLOADS_DIR = join(__dirname, "uploads");
@@ -280,7 +288,8 @@ app.post("/api/bookings", async (req, res) => {
     // Send emails
     try {
       const transport = await getTransporter();
-      const from = `${process.env.MAIL_FROM_NAME || "Purrfect Cups"} <${process.env.MAIL_FROM_ADDRESS || "noreply@purrfectcups.hu"}>`;
+      const fromAddr = process.env.MAIL_FROM_ADDRESS || process.env.SMTP_USER || "noreply@purrfectcups.hu";
+      const from = `${process.env.MAIL_FROM_NAME || "Purrfect Cups"} <${fromAddr}>`;
 
       const guestMail = buildConfirmationEmail(booking);
       await transport.sendMail({ from, to: booking.email, ...guestMail });
