@@ -324,47 +324,49 @@ function stripSensitive(b) {
 app.use("/uploads", express.static(UPLOADS_DIR));
 
 // Create review
-app.post("/api/reviews", (req, res) => {
+app.post("/api/reviews", (req, res, next) => {
   upload.single("image")(req, res, (uploadErr) => {
     if (uploadErr) {
-      if (uploadErr instanceof multer.MulterError && uploadErr.code === "LIMIT_FILE_SIZE") {
-        return res.status(400).json({ error: "Image must be under 2 MB." });
+      if (uploadErr instanceof multer.MulterError) {
+        if (uploadErr.code === "LIMIT_FILE_SIZE") return res.status(400).json({ error: "Image must be under 2 MB." });
+        return res.status(400).json({ error: `Upload error: ${uploadErr.message}` });
       }
       return res.status(400).json({ error: uploadErr.message });
     }
-
-    try {
-      const { name, source, stars, text } = req.body;
-
-      const cleanName = sanitizeStr(name, 60) || "Anonymous";
-      const cleanSource = sanitizeStr(source, 60) || "Guest";
-      const cleanText = sanitizeStr(text, 1000);
-      const cleanStars = Math.min(Math.max(parseInt(stars) || 5, 1), 5);
-
-      if (!cleanText) {
-        return res.status(400).json({ error: "Review text is required." });
-      }
-
-      const review = {
-        id: randomUUID().slice(0, 8),
-        name: cleanName,
-        source: cleanSource,
-        stars: cleanStars,
-        text: cleanText,
-        image: req.file ? `/uploads/${req.file.filename}` : undefined,
-        createdAt: new Date().toISOString(),
-      };
-
-      const db = readReviewsDB();
-      db.unshift(review);
-      writeReviewsDB(db.slice(0, 200));
-
-      return res.json({ ok: true, review });
-    } catch (err) {
-      console.error("Review error:", err);
-      return res.status(500).json({ error: "Internal server error" });
-    }
+    next();
   });
+}, (req, res) => {
+  try {
+    const { name, source, stars, text } = req.body;
+
+    const cleanName = sanitizeStr(name, 60) || "Anonymous";
+    const cleanSource = sanitizeStr(source, 60) || "Guest";
+    const cleanText = sanitizeStr(text, 1000);
+    const cleanStars = Math.min(Math.max(parseInt(stars) || 5, 1), 5);
+
+    if (!cleanText) {
+      return res.status(400).json({ error: "Review text is required." });
+    }
+
+    const review = {
+      id: randomUUID().slice(0, 8),
+      name: cleanName,
+      source: cleanSource,
+      stars: cleanStars,
+      text: cleanText,
+      image: req.file ? `/uploads/${req.file.filename}` : undefined,
+      createdAt: new Date().toISOString(),
+    };
+
+    const db = readReviewsDB();
+    db.unshift(review);
+    writeReviewsDB(db.slice(0, 200));
+
+    return res.json({ ok: true, review });
+  } catch (err) {
+    console.error("Review error:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 // List reviews
