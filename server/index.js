@@ -295,7 +295,7 @@ app.post("/api/bookings", async (req, res) => {
       const apiKey = process.env.EMAIL_API_KEY;
       if (!apiKey) throw new Error("No EMAIL_API_KEY configured");
 
-      const fromEmail = process.env.MAIL_FROM_ADDRESS || "noreply@purrfectcups.hu";
+      const fromEmail = process.env.MAIL_FROM_ADDRESS || process.env.SMTP_USER || "darkintestmail@gmail.com";
 
       const sendOne = async (to, subject, html) => {
         const res = await fetch("https://api.elasticemail.com/v4/emails", {
@@ -330,7 +330,7 @@ app.post("/api/bookings", async (req, res) => {
     try {
       // Try SMTP first (works locally), fallback to ElasticEmail API (works on Render)
       const t = await getTransporter();
-      const fa = process.env.MAIL_FROM_ADDRESS || process.env.SMTP_USER || "noreply@purrfectcups.hu";
+      const fa = process.env.MAIL_FROM_ADDRESS || process.env.SMTP_USER || "darkintestmail@gmail.com";
       const from = `${process.env.MAIL_FROM_NAME || "Purrfect Cups"} <${fa}>`;
       await t.sendMail({ from, to: booking.email, ...buildConfirmationEmail(booking) });
       if (process.env.STAFF_EMAIL) {
