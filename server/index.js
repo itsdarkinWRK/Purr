@@ -298,19 +298,22 @@ app.post("/api/bookings", async (req, res) => {
       const fromEmail = process.env.MAIL_FROM_ADDRESS || "noreply@purrfectcups.hu";
 
       const sendOne = async (to, subject, html) => {
-        const res = await fetch("https://api.mailersend.com/v1/email", {
+        const res = await fetch("https://api.elasticemail.com/v4/emails", {
           method: "POST",
-          headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+          headers: { "X-ElasticEmail-ApiKey": apiKey, "Content-Type": "application/json" },
           body: JSON.stringify({
-            from: { email: fromEmail, name: "Purrfect Cups" },
-            to: [{ email: to }],
-            subject,
-            html,
+            Recipients: [{ Email: to }],
+            Content: {
+              From: fromEmail,
+              FromName: "Purrfect Cups",
+              Subject: subject,
+              Body: [{ ContentType: "HTML", Content: html }],
+            },
           }),
         });
         if (!res.ok) {
           const text = await res.text();
-          throw new Error(`MailerSend API ${res.status}: ${text}`);
+          throw new Error(`ElasticEmail API ${res.status}: ${text}`);
         }
       };
 
@@ -325,7 +328,7 @@ app.post("/api/bookings", async (req, res) => {
     };
 
     try {
-      // Try SMTP first (works locally), fallback to MailerSend API (works on Render)
+      // Try SMTP first (works locally), fallback to ElasticEmail API (works on Render)
       const t = await getTransporter();
       const fa = process.env.MAIL_FROM_ADDRESS || process.env.SMTP_USER || "noreply@purrfectcups.hu";
       const from = `${process.env.MAIL_FROM_NAME || "Purrfect Cups"} <${fa}>`;
@@ -340,7 +343,7 @@ app.post("/api/bookings", async (req, res) => {
         await sendViaApi();
         emailSent = true;
         usedFallback = true;
-        console.log("Email sent via MailerSend API");
+        console.log("Email sent via ElasticEmail API");
       } catch (apiErr) {
         console.error("API also failed:", apiErr.message);
       }
