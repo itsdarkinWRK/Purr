@@ -288,39 +288,63 @@ app.post("/api/bookings", async (req, res) => {
     db.unshift(booking);
     writeDB(db.slice(0, 500));
 
-    // Send emails (with Ethereal fallback if primary fails)
+    // Send emails
     let emailSent = false;
     let usedFallback = false;
-    const trySend = async (fallback) => {
-      const t = await (fallback
-        ? (async () => {
-            const a = await nodemailer.createTestAccount();
-            const tr = nodemailer.createTransport({
-              host: "smtp.ethereal.email", port: 587, secure: false,
-              auth: { user: a.user, pass: a.pass },
-            });
-            console.log("Ethereal fallback:", a.user, `https://ethereal.email/login`);
-            return tr;
-          })()
-        : getTransporter());
-      const fa = fallback ? "noreply@purrfectcups.hu" : (process.env.MAIL_FROM_ADDRESS || process.env.SMTP_USER || "noreply@purrfectcups.hu");
-      const from = `${process.env.MAIL_FROM_NAME || "Purrfect Cups"} <${fa}>`;
-      await t.sendMail({ from, to: booking.email, ...buildConfirmationEmail(booking) });
-      if (!fallback && process.env.STAFF_EMAIL) {
-        await t.sendMail({ from, to: process.env.STAFF_EMAIL, ...buildStaffNotificationEmail(booking) });
+
+    const sendViaApi = async () => {
+      const apiKey = process.env.EMAIL_API_KEY;
+      if (!apiKey) throw new Error("No EMAIL_API_KEY configured");
+
+      const headers = { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" };
+      const fromEmail = process.env.MAIL_FROM_ADDRESS || "noreply@purrfectcups.hu";
+
+      const sendOne = async (to, subject, html) => {
+        const res = await fetch("https://send.api.mailtrap.io/api/send", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            from: { email: fromEmail, name: "Purrfect Cups" },
+            to: [{ email: to }],
+            subject,
+            html,
+          }),
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(`Mailtrap API ${res.status}: ${text}`);
+        }
+      };
+
+      const mail = buildConfirmationEmail(booking);
+      await sendOne(booking.email, mail.subject, mail.html);
+
+      const staffMail = process.env.STAFF_EMAIL;
+      if (staffMail && staffMail !== booking.email) {
+        const notice = buildStaffNotificationEmail(booking);
+        await sendOne(staffMail, notice.subject, notice.html);
       }
     };
+
     try {
-      await trySend(false);
+      // Try SMTP first (works locally), fallback to Brevo API (works on Render)
+      const t = await getTransporter();
+      const fa = process.env.MAIL_FROM_ADDRESS || process.env.SMTP_USER || "noreply@purrfectcups.hu";
+      const from = `${process.env.MAIL_FROM_NAME || "Purrfect Cups"} <${fa}>`;
+      await t.sendMail({ from, to: booking.email, ...buildConfirmationEmail(booking) });
+      if (process.env.STAFF_EMAIL) {
+        await t.sendMail({ from, to: process.env.STAFF_EMAIL, ...buildStaffNotificationEmail(booking) });
+      }
       emailSent = true;
-    } catch (primaryErr) {
-      console.error("Primary SMTP failed:", primaryErr.message);
+    } catch (smtpErr) {
+      console.error("SMTP failed:", smtpErr.message);
       try {
-        await trySend(true);
+        await sendViaApi();
         emailSent = true;
         usedFallback = true;
-      } catch (fallbackErr) {
-        console.error("Fallback SMTP also failed:", fallbackErr.message);
+        console.log("Email sent via Brevo API");
+      } catch (apiErr) {
+        console.error("API also failed:", apiErr.message);
       }
     }
 
