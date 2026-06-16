@@ -288,51 +288,40 @@ app.post("/api/bookings", async (req, res) => {
     db.unshift(booking);
     writeDB(db.slice(0, 500));
 
-    // Send emails (with Ethereal fallback if primary SMTP fails)
+    // Send emails (with Ethereal fallback if primary fails)
     let emailSent = false;
     let usedFallback = false;
+    const trySend = async (fallback) => {
+      const t = await (fallback
+        ? (async () => {
+            const a = await nodemailer.createTestAccount();
+            const tr = nodemailer.createTransport({
+              host: "smtp.ethereal.email", port: 587, secure: false,
+              auth: { user: a.user, pass: a.pass },
+            });
+            console.log("Ethereal fallback:", a.user, `https://ethereal.email/login`);
+            return tr;
+          })()
+        : getTransporter());
+      const fa = fallback ? "noreply@purrfectcups.hu" : (process.env.MAIL_FROM_ADDRESS || process.env.SMTP_USER || "noreply@purrfectcups.hu");
+      const from = `${process.env.MAIL_FROM_NAME || "Purrfect Cups"} <${fa}>`;
+      await t.sendMail({ from, to: booking.email, ...buildConfirmationEmail(booking) });
+      if (!fallback && process.env.STAFF_EMAIL) {
+        await t.sendMail({ from, to: process.env.STAFF_EMAIL, ...buildStaffNotificationEmail(booking) });
+      }
+    };
     try {
-      let transport;
-      try {
-        transport = await getTransporter();
-      } catch {
-        // Transporter creation failed — reset for fallback
-        transporter = null;
-      }
-
-      if (!transport) {
-        // Fallback: create fresh Ethereal account
-        const testAccount = await nodemailer.createTestAccount();
-        transporter = nodemailer.createTransport({
-          host: "smtp.ethereal.email",
-          port: 587,
-          secure: false,
-          auth: { user: testAccount.user, pass: testAccount.pass },
-        });
-        usedFallback = true;
-        console.log("SMTP fallback: using Ethereal");
-        console.log(`  Web: https://ethereal.email/login`);
-        console.log(`  User: ${testAccount.user}`);
-        console.log(`  Pass: ${testAccount.pass}`);
-      }
-
-      const fromAddr = usedFallback
-        ? "noreply@purrfectcups.hu"
-        : process.env.MAIL_FROM_ADDRESS || process.env.SMTP_USER || "noreply@purrfectcups.hu";
-      const from = `${process.env.MAIL_FROM_NAME || "Purrfect Cups"} <${fromAddr}>`;
-
-      const guestMail = buildConfirmationEmail(booking);
-      await transporter.sendMail({ from, to: booking.email, ...guestMail });
-
-      const staffMailTo = process.env.STAFF_EMAIL;
-      if (staffMailTo && !usedFallback) {
-        const staffMail = buildStaffNotificationEmail(booking);
-        await transporter.sendMail({ from, to: staffMailTo, ...staffMail });
-      }
-
+      await trySend(false);
       emailSent = true;
-    } catch (emailErr) {
-      console.error("Email send failed:", emailErr.message);
+    } catch (primaryErr) {
+      console.error("Primary SMTP failed:", primaryErr.message);
+      try {
+        await trySend(true);
+        emailSent = true;
+        usedFallback = true;
+      } catch (fallbackErr) {
+        console.error("Fallback SMTP also failed:", fallbackErr.message);
+      }
     }
 
     return res.json({
