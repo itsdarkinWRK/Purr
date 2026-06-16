@@ -121,14 +121,17 @@ async function getTransporter() {
     console.log("  Web:  https://ethereal.email/login\n");
   }
 
+  const host = process.env.SMTP_HOST || "smtp.ethereal.email";
+  const port = parseInt(process.env.SMTP_PORT || "587");
+
   transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || "smtp.ethereal.email",
-    port: parseInt(process.env.SMTP_PORT || "587"),
-    secure: process.env.SMTP_PORT === "465",
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
+    host,
+    port,
+    secure: port === 465,
+    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    ...(host === "smtp.gmail.com" && port === 587 ? { tls: { rejectUnauthorized: false } } : {}),
   });
 
   return transporter;
