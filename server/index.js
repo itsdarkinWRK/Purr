@@ -18,9 +18,6 @@ const PORT = process.env.PORT || 3001;
 // Ensure uploads directory exists
 if (!existsSync(UPLOADS_DIR)) mkdirSync(UPLOADS_DIR, { recursive: true });
 
-// Allowed origins for CORS
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "http://localhost:5173,http://localhost:4173").split(",").map(s => s.trim());
-
 const ADMIN_USER = process.env.ADMIN_USER || "admin";
 const ADMIN_PASS = process.env.ADMIN_PASS || "";
 
@@ -194,13 +191,8 @@ const app = express();
 // Trust proxy for rate limiter behind reverse proxy
 app.set("trust proxy", 1);
 
-// CORS — only allow configured origins
-app.use(cors({
-  origin: (origin, cb) => {
-    if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
-    cb(new Error("Not allowed by CORS"));
-  },
-}));
+// CORS
+app.use(cors());
 
 app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true, limit: "10kb" }));
@@ -386,9 +378,6 @@ if (existsSync(DIST_DIR)) {
 
 // Global error handler
 app.use((err, _req, res, _next) => {
-  if (err.message === "Not allowed by CORS") {
-    return res.status(403).json({ error: "Origin not allowed" });
-  }
   console.error("Unhandled error:", err);
   res.status(500).json({ error: "Internal server error" });
 });
