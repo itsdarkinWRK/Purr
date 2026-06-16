@@ -14,9 +14,6 @@
   <a href="https://purrcups.onrender.com" target="_blank">
     <img src="https://img.shields.io/badge/Live%20Demo-%F0%9F%90%B1%20Purrfect%20Cups-blueviolet?style=for-the-badge&logo=render&logoColor=white" alt="Live Demo">
   </a>
-  <a href="https://github.com/itsdarkin/purrcups" target="_blank">
-    <img src="https://img.shields.io/badge/GitHub-Repo-181717?style=for-the-badge&logo=github&logoColor=white" alt="GitHub">
-  </a>
 </p>
 
 ---
