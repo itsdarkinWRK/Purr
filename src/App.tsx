@@ -525,11 +525,13 @@ function BookingSection() {
 
       if (data.emailSent) {
         toast.success("Purrfect! Reservation confirmed. Check your email.", {
-          description: `${form.date} • ${form.time} • ${form.zone === "main" ? "Main Lounge" : "Quiet Purr Zone"} • ${form.guests} guests`
+          description: data.emailFallback
+            ? `${form.date} • ${form.time} • ${form.guests} guests (test email via Ethereal)`
+            : `${form.date} • ${form.time} • ${form.zone === "main" ? "Main Lounge" : "Quiet Purr Zone"} • ${form.guests} guests`
         });
       } else {
         toast.success("Reservation saved locally.", {
-          description: "Email confirmation could not be sent — check server SMTP config."
+          description: "Email confirmation could not be sent."
         });
       }
       setForm({ name: "", email: "", date: "", time: "15:00", guests: 2, zone: "main", note: "" });

@@ -288,26 +288,59 @@ app.post("/api/bookings", async (req, res) => {
     db.unshift(booking);
     writeDB(db.slice(0, 500));
 
-    // Send emails
+    // Send emails (with Ethereal fallback if primary SMTP fails)
+    let emailSent = false;
+    let usedFallback = false;
     try {
-      const transport = await getTransporter();
-      const fromAddr = process.env.MAIL_FROM_ADDRESS || process.env.SMTP_USER || "noreply@purrfectcups.hu";
+      let transport;
+      try {
+        transport = await getTransporter();
+      } catch {
+        // Transporter creation failed — reset for fallback
+        transporter = null;
+      }
+
+      if (!transport) {
+        // Fallback: create fresh Ethereal account
+        const testAccount = await nodemailer.createTestAccount();
+        transporter = nodemailer.createTransport({
+          host: "smtp.ethereal.email",
+          port: 587,
+          secure: false,
+          auth: { user: testAccount.user, pass: testAccount.pass },
+        });
+        usedFallback = true;
+        console.log("SMTP fallback: using Ethereal");
+        console.log(`  Web: https://ethereal.email/login`);
+        console.log(`  User: ${testAccount.user}`);
+        console.log(`  Pass: ${testAccount.pass}`);
+      }
+
+      const fromAddr = usedFallback
+        ? "noreply@purrfectcups.hu"
+        : process.env.MAIL_FROM_ADDRESS || process.env.SMTP_USER || "noreply@purrfectcups.hu";
       const from = `${process.env.MAIL_FROM_NAME || "Purrfect Cups"} <${fromAddr}>`;
 
       const guestMail = buildConfirmationEmail(booking);
-      await transport.sendMail({ from, to: booking.email, ...guestMail });
+      await transporter.sendMail({ from, to: booking.email, ...guestMail });
 
       const staffMailTo = process.env.STAFF_EMAIL;
-      if (staffMailTo) {
+      if (staffMailTo && !usedFallback) {
         const staffMail = buildStaffNotificationEmail(booking);
-        await transport.sendMail({ from, to: staffMailTo, ...staffMail });
+        await transporter.sendMail({ from, to: staffMailTo, ...staffMail });
       }
 
-      return res.json({ ok: true, booking: stripSensitive(booking), emailSent: true });
+      emailSent = true;
     } catch (emailErr) {
       console.error("Email send failed:", emailErr.message);
-      return res.json({ ok: true, booking: stripSensitive(booking), emailSent: false });
     }
+
+    return res.json({
+      ok: true,
+      booking: stripSensitive(booking),
+      emailSent,
+      emailFallback: usedFallback,
+    });
   } catch (err) {
     console.error("Booking error:", err);
     return res.status(500).json({ error: "Internal server error" });
