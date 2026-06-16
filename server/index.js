@@ -131,7 +131,6 @@ async function getTransporter() {
     auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
     connectionTimeout: 15000,
     greetingTimeout: 15000,
-    ...(host === "smtp.gmail.com" && port === 587 ? { tls: { rejectUnauthorized: false } } : {}),
   });
 
   return transporter;
@@ -296,13 +295,14 @@ app.post("/api/bookings", async (req, res) => {
       const apiKey = process.env.EMAIL_API_KEY;
       if (!apiKey) throw new Error("No EMAIL_API_KEY configured");
 
-      const headers = { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" };
       const fromEmail = process.env.MAIL_FROM_ADDRESS || "noreply@purrfectcups.hu";
+      const inboxId = process.env.MAILTRAP_INBOX_ID;
 
       const sendOne = async (to, subject, html) => {
-        const res = await fetch("https://send.api.mailtrap.io/api/send", {
+        // Try 1: Email Sending API with Bearer token
+        let res = await fetch("https://send.api.mailtrap.io/api/send", {
           method: "POST",
-          headers,
+          headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
           body: JSON.stringify({
             from: { email: fromEmail, name: "Purrfect Cups" },
             to: [{ email: to }],
@@ -310,6 +310,34 @@ app.post("/api/bookings", async (req, res) => {
             html,
           }),
         });
+        // Try 2: Email Sending API with Api-Token header
+        if (res.status === 401) {
+          res = await fetch("https://send.api.mailtrap.io/api/send", {
+            method: "POST",
+            headers: { "Api-Token": apiKey, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              from: { email: fromEmail, name: "Purrfect Cups" },
+              to: [{ email: to }],
+              subject,
+              html,
+            }),
+          });
+        }
+        // Try 3: Email Testing API (capture to inbox)
+        if (res.status === 401 && inboxId) {
+          res = await fetch(`https://mailtrap.io/api/1/inboxes/${inboxId}/emails`, {
+            method: "POST",
+            headers: { "Api-Token": apiKey, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: {
+                from: [{ email: fromEmail, name: "Purrfect Cups" }],
+                to: [{ email: to }],
+                subject,
+                html,
+              },
+            }),
+          });
+        }
         if (!res.ok) {
           const text = await res.text();
           throw new Error(`Mailtrap API ${res.status}: ${text}`);
@@ -327,7 +355,7 @@ app.post("/api/bookings", async (req, res) => {
     };
 
     try {
-      // Try SMTP first (works locally), fallback to Brevo API (works on Render)
+      // Try SMTP first (works locally), fallback to Mailtrap API (works on Render)
       const t = await getTransporter();
       const fa = process.env.MAIL_FROM_ADDRESS || process.env.SMTP_USER || "noreply@purrfectcups.hu";
       const from = `${process.env.MAIL_FROM_NAME || "Purrfect Cups"} <${fa}>`;
@@ -342,7 +370,7 @@ app.post("/api/bookings", async (req, res) => {
         await sendViaApi();
         emailSent = true;
         usedFallback = true;
-        console.log("Email sent via Brevo API");
+        console.log("Email sent via Mailtrap API");
       } catch (apiErr) {
         console.error("API also failed:", apiErr.message);
       }
