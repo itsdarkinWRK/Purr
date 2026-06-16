@@ -296,11 +296,9 @@ app.post("/api/bookings", async (req, res) => {
       if (!apiKey) throw new Error("No EMAIL_API_KEY configured");
 
       const fromEmail = process.env.MAIL_FROM_ADDRESS || "noreply@purrfectcups.hu";
-      const inboxId = process.env.MAILTRAP_INBOX_ID;
 
       const sendOne = async (to, subject, html) => {
-        // Try 1: Email Sending API with Bearer token
-        let res = await fetch("https://send.api.mailtrap.io/api/send", {
+        const res = await fetch("https://api.mailersend.com/v1/email", {
           method: "POST",
           headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -310,37 +308,9 @@ app.post("/api/bookings", async (req, res) => {
             html,
           }),
         });
-        // Try 2: Email Sending API with Api-Token header
-        if (res.status === 401) {
-          res = await fetch("https://send.api.mailtrap.io/api/send", {
-            method: "POST",
-            headers: { "Api-Token": apiKey, "Content-Type": "application/json" },
-            body: JSON.stringify({
-              from: { email: fromEmail, name: "Purrfect Cups" },
-              to: [{ email: to }],
-              subject,
-              html,
-            }),
-          });
-        }
-        // Try 3: Email Testing API (capture to inbox)
-        if (res.status === 401 && inboxId) {
-          res = await fetch(`https://mailtrap.io/api/1/inboxes/${inboxId}/emails`, {
-            method: "POST",
-            headers: { "Api-Token": apiKey, "Content-Type": "application/json" },
-            body: JSON.stringify({
-              email: {
-                from: [{ email: fromEmail, name: "Purrfect Cups" }],
-                to: [{ email: to }],
-                subject,
-                html,
-              },
-            }),
-          });
-        }
         if (!res.ok) {
           const text = await res.text();
-          throw new Error(`Mailtrap API ${res.status}: ${text}`);
+          throw new Error(`MailerSend API ${res.status}: ${text}`);
         }
       };
 
@@ -355,7 +325,7 @@ app.post("/api/bookings", async (req, res) => {
     };
 
     try {
-      // Try SMTP first (works locally), fallback to Mailtrap API (works on Render)
+      // Try SMTP first (works locally), fallback to MailerSend API (works on Render)
       const t = await getTransporter();
       const fa = process.env.MAIL_FROM_ADDRESS || process.env.SMTP_USER || "noreply@purrfectcups.hu";
       const from = `${process.env.MAIL_FROM_NAME || "Purrfect Cups"} <${fa}>`;
@@ -370,7 +340,7 @@ app.post("/api/bookings", async (req, res) => {
         await sendViaApi();
         emailSent = true;
         usedFallback = true;
-        console.log("Email sent via Mailtrap API");
+        console.log("Email sent via MailerSend API");
       } catch (apiErr) {
         console.error("API also failed:", apiErr.message);
       }
