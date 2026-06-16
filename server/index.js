@@ -373,6 +373,15 @@ app.get("/api/reviews", (_req, res) => {
   res.json(db.slice(0, 100));
 });
 
+// Serve built frontend for non-API routes (production / Render)
+const DIST_DIR = join(__dirname, "..", "dist");
+if (existsSync(DIST_DIR)) {
+  app.use(express.static(DIST_DIR));
+  app.get("*", (_req, res) => {
+    res.sendFile(join(DIST_DIR, "index.html"));
+  });
+}
+
 // Global error handler
 app.use((err, _req, res, _next) => {
   if (err.message === "Not allowed by CORS") {
