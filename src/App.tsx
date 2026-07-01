@@ -181,8 +181,7 @@ function SiteNav() {
 
   return (
     <header className="fixed top-0 inset-x-0 z-50">
-      <div className="mx-auto max-w-6xl px-5 sm:px-8 lg:px-10 pt-4">
-        <div className="flex items-center justify-between rounded-full border border-white/25 bg-[#1e1815]/55 backdrop-blur-xl px-4 sm:px-6 py-3 shadow-[0_16px_50px_rgba(25,17,13,.23)]">
+      <div className="flex items-center justify-between border-b border-white/10 bg-[#1e1815]/70 backdrop-blur-xl px-5 sm:px-8 lg:px-10 py-3.5 shadow-lg">
           <a href="#" className="flex items-center gap-3 text-[#f7f1e7]">
             <span className="w-9 h-9 rounded-full bg-[#f5ece0] text-[#2d221c] grid place-items-center">
               <CatPawIcon className="w-[17px] h-[17px]" />
@@ -236,7 +235,6 @@ function SiteNav() {
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
     </header>
   );
 }
