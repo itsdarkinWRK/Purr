@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+server/node_modules/
+server/uploads/*
+server/.env
+*.log
+.DS_Store
+Thumbs.db
+*.rar
+*.zip
+*.7z
