@@ -29,7 +29,7 @@ body {
 }
 
 .cat-overlay {
-  top: calc(100svh - 17vh);
+  top: calc(100svh - 16vh);
 }
 
 .cat-overlay-img {
