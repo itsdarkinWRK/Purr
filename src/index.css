@@ -27,3 +27,20 @@ body {
 .font-display {
   font-family: var(--font-display);
 }
+
+.cat-overlay {
+  top: calc(100svh - 38vh);
+}
+
+.cat-overlay-img {
+  max-height: 55vh;
+}
+
+@media (min-width: 640px) {
+  .cat-overlay {
+    top: calc(100svh - 51vh);
+  }
+  .cat-overlay-img {
+    max-height: 105vh;
+  }
+}

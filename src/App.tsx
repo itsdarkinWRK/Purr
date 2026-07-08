@@ -155,12 +155,11 @@ export default function App() {
       <SiteNav />
       <main className="relative">
         <Hero />
-        <div className="absolute left-1/2 z-30 pointer-events-none"
+        <div className="absolute left-1/2 z-30 pointer-events-none cat-overlay"
              style={{
-               top: "calc(100svh - 51vh)",
                transform: "translateX(-50%)"
              }}>
-          <img src="/images/hero.png" alt="" className="block max-h-[105vh] w-auto" />
+          <img src="/images/hero.png" alt="" className="block w-auto cat-overlay-img" />
         </div>
         <Concept />
         <Residents />
